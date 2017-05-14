@@ -9,6 +9,7 @@ module DockerTask
     }
 
     DOCKER_CMD = 'docker'
+    GCLOUD_DOCKER_CMD = 'gcloud docker'
 
     attr_reader :options
 
@@ -136,7 +137,7 @@ module DockerTask
                 fail "Mirror %s not found" % mk
               end
             else
-              push_repo = '%s/%s' % [ @options[:registry], @options[:push_repo] ]
+              push_repo = repo_with_registry(@options[:push_repo], @options[:registry])
             end
 
             docker_do 'tag %s %s' % [ @options[:image_name], push_repo ]
@@ -149,7 +150,7 @@ module DockerTask
         desc 'Pull from registry based on push_repo options'
         task :pull do
           if @options[:push_repo]
-            pull_repo = '%s/%s' % [ @options[:registry], @options[:push_repo] ]
+            pull_repo = repo_with_registry(@options[:push_repo], @options[:registry])
 
             docker_do 'pull %s' % pull_repo
             docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
@@ -161,7 +162,7 @@ module DockerTask
         desc 'Re-tag a local copy from latest remote (will not pull)'
         task :retag do
           if @options[:push_repo]
-            pull_repo = '%s/%s' % [ @options[:registry], @options[:push_repo] ]
+            pull_repo = repo_with_registry(@options[:push_repo], @options[:registry])
             docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
           else
             puts 'Please specify a push_repo for this docker context'
@@ -175,10 +176,28 @@ module DockerTask
         end
 
         desc 'Stop and remove container'
-        task 'remove' do
+        task :remove do
           docker_do 'kill %s' % container_name, :ignore_fail => true
           docker_do 'rm %s' % container_name, :ignore_fail => true
         end
+      end
+    end
+
+    def repo_with_registry(repo_name, registry = nil)
+      if registry.nil?
+        repo_name
+      else
+        '%s/%s' % [ registry, repo_name ]
+      end
+    end
+
+    def docker_cmd(registry = nil)
+      if registry.nil?
+        DOCKER_CMD
+      elsif registry =~ /\.grc\.io/
+        GCLOUD_DOCKER_CMD
+      else
+        DOCKER_CMD
       end
     end
 
@@ -187,7 +206,7 @@ module DockerTask
         cmd += '; true'
       end
 
-      sh '%s %s' % [ DOCKER_CMD, cmd ]
+      sh '%s %s' % [ docker_cmd, cmd ]
     end
 
     def invoke_task(tname)
