@@ -11,13 +11,13 @@ Gem::Specification.new do |spec|
 
   spec.summary       = %q{A rake helper in working with Docker containers.}
   spec.description   = %q{A rake helper of common tasks for use when working with Docker containers.}
-  spec.homepage      = "https://nlevel.github.io/docker_task/"
+  spec.homepage      = "https://github.com/nlevel/docker_task"
   spec.license       = "MIT"
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.
   if spec.respond_to?(:metadata)
-    spec.metadata['allowed_push_host'] = "https://gem.fury.io/nlevel/"
+    spec.metadata['allowed_push_host'] = "https://rubygems.org"
   else
     raise "RubyGems 2.0 or newer is required to protect against " \
       "public gem pushes."

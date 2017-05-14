@@ -7,4 +7,4 @@
 /pkg/
 /spec/reports/
 /tmp/
-docker_task-0.1.1.gem
+docker_task-*.gem
