@@ -14,8 +14,26 @@ module DockerTask
     attr_reader :options
 
     def initialize(options = { })
+      options = DockerTask::Helper.symbolize_keys(options)
       @options = DEFAULT_OPTIONS.merge(options)
+
       yield(self) if block_given?
+
+      normalize_options!
+    end
+
+    def normalize_options!
+      if !@options.include?(:remote_repo)
+        @options[:remote_repo] = @options[:push_repo]
+      end
+
+      if !@options.include?(:image_name)
+        @options[:image_name] = @options[:remote_repo]
+      end
+
+      if !@options.include?(:container_name)
+        @options[:container_name] = @options[:image_name]
+      end
     end
 
     def task_namespace
@@ -59,11 +77,20 @@ module DockerTask
         desc 'Run the latest docker image'
         task :run do
           run_opts = [ ]
+          end_opts = nil
 
           if ENV['INTERACTIVE'] == '1'
             run_opts << '--rm -t -i'
           else
-            run_opts = @options[:run].call(self, run_opts)
+            unless @options[:run].nil?
+              run_opts = @options[:run].call(self, run_opts)
+            end
+
+            eof_item = run_opts.index(nil)
+            unless eof_item.nil?
+              end_opts = run_opts.slice!(eof_item..-1)
+              end_opts.shift
+            end
 
             run_opts << '-d'
             run_opts << '--name=%s' % container_name
@@ -73,8 +100,10 @@ module DockerTask
 
           if ENV['INTERACTIVE'] == '1'
             docker_do 'run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ], :ignore_fail => true
-          else
+          elsif end_opts.nil?
             docker_do 'run %s' % run_opts.join(' ')
+          else
+            docker_do 'run %s %s' % [ run_opts.join(' '), end_opts.join(' ') ]
           end
         end
 
@@ -120,7 +149,7 @@ module DockerTask
 
         desc 'Push latest built image to repo'
         task :push do
-          if @options[:push_repo]
+          if @options[:remote_repo]
             should_create_tag = false
 
             if !ENV['PUSH_MIRROR'].nil? && !ENV['PUSH_MIRROR'].empty?
@@ -137,35 +166,35 @@ module DockerTask
                 fail "Mirror %s not found" % mk
               end
             else
-              push_repo = repo_with_registry(@options[:push_repo], @options[:registry])
+              push_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
             end
 
             docker_do 'tag %s %s' % [ @options[:image_name], push_repo ]
             docker_do 'push %s' % push_repo
           else
-            puts 'Please specify a push_repo for this docker context'
+            puts 'Please specify a remote_repo for this docker context'
           end
         end
 
-        desc 'Pull from registry based on push_repo options'
+        desc 'Pull from registry based on remote_repo options'
         task :pull do
-          if @options[:push_repo]
-            pull_repo = repo_with_registry(@options[:push_repo], @options[:registry])
+          if @options[:remote_repo]
+            pull_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
 
             docker_do 'pull %s' % pull_repo
             docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
           else
-            puts 'Please specify a push_repo for this docker context'
+            puts 'Please specify a remote_repo for this docker context'
           end
         end
 
         desc 'Re-tag a local copy from latest remote (will not pull)'
         task :retag do
-          if @options[:push_repo]
-            pull_repo = repo_with_registry(@options[:push_repo], @options[:registry])
+          if @options[:remote_repo]
+            pull_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
             docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
           else
-            puts 'Please specify a push_repo for this docker context'
+            puts 'Please specify a remote_repo for this docker context'
           end
         end
 
