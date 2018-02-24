@@ -79,13 +79,13 @@ module DockerTask
           run_opts = [ ]
           end_opts = nil
 
+          unless @options[:run].nil?
+            run_opts = @options[:run].call(self, run_opts)
+          end
+
           if ENV['INTERACTIVE'] == '1'
             run_opts << '--rm -t -i'
           else
-            unless @options[:run].nil?
-              run_opts = @options[:run].call(self, run_opts)
-            end
-
             eof_item = run_opts.index(nil)
             unless eof_item.nil?
               end_opts = run_opts.slice!(eof_item..-1)
@@ -96,9 +96,11 @@ module DockerTask
             run_opts << '--name=%s' % container_name
           end
 
-          run_opts << '%s:%s' % [ @options[:image_name], @options.fetch(:image_tag, 'latest') ]
+          run_opts << '%s:%s' % [ @options[:image_name], @options.fetch(:run_tag, 'latest') ]
 
-          if ENV['INTERACTIVE'] == '1'
+          if ENV['EXEC']
+            docker_do 'run %s /bin/bash -l -c %s' % [ run_opts.join(' '), ENV['EXEC'] ], :ignore_fail => true
+          elsif ENV['INTERACTIVE'] == '1'
             docker_do 'run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ], :ignore_fail => true
           elsif end_opts.nil?
             docker_do 'run %s' % run_opts.join(' ')
@@ -181,8 +183,13 @@ module DockerTask
           if @options[:remote_repo]
             pull_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
 
-            docker_do 'pull %s' % pull_repo
-            docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
+            if @options[:pull_tag].nil?
+              docker_do 'pull %s' % pull_repo
+              docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
+            else
+              docker_do 'pull %s:%s' % [ pull_repo, @options[:pull_tag] ]
+              docker_do 'tag %s:%s %s' % [ pull_repo, @options[:pull_tag], @options[:image_name] ]
+            end
           else
             puts 'Please specify a remote_repo for this docker context'
           end

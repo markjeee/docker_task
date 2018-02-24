@@ -5,7 +5,7 @@ require 'docker_task/version'
 
 Gem::Specification.new do |spec|
   spec.name          = "docker_task"
-  spec.version       = DockerTask::VERSION
+  spec.version       = ENV['BUILD_VERSION'] || DockerTask::VERSION
   spec.authors       = ["Mark John Buenconsejo"]
   spec.email         = ["mark@nlevel.io"]
 
@@ -35,5 +35,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "bundler", "~> 1.14"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "minitest", "~> 5.0"
-  spec.add_development_dependency "gemfury"
+  spec.add_development_dependency "gemfury", "~> 0.7"
 end
