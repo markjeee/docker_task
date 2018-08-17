@@ -55,6 +55,10 @@ module DockerTask
       docker_do 'build -t %s .' % image_name
     end
 
+    def runi(opts = { })
+      run({ :interactive => true }.merge(opts))
+    end
+
     def run(opts = { })
       run_opts = [ ]
       end_opts = nil
