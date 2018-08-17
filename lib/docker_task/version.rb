@@ -1,3 +1,3 @@
 module DockerTask
-  VERSION = "0.1.3.pre2"
+  VERSION = '0.1.4.pre1'
 end

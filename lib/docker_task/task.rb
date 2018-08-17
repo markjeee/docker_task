@@ -8,9 +8,6 @@ module DockerTask
       :namespace => :docker
     }
 
-    DOCKER_CMD = 'docker'
-    GCLOUD_DOCKER_CMD = 'gcloud docker'
-
     attr_reader :options
 
     def initialize(options = { })
@@ -19,20 +16,13 @@ module DockerTask
 
       yield(self) if block_given?
 
-      normalize_options!
-    end
-
-    def normalize_options!
-      if !@options.include?(:remote_repo)
-        @options[:remote_repo] = @options[:push_repo]
+      @docker_exec = nil
+      if @options[:use]
+        @docker_exec = DockerTask.containers[@options[:use]]
       end
 
-      if !@options.include?(:image_name)
-        @options[:image_name] = @options[:remote_repo]
-      end
-
-      if !@options.include?(:container_name)
-        @options[:container_name] = @options[:image_name]
+      if @docker_exec.nil?
+        @docker_exec = DockerExec.new({ task: self }.merge(@options))
       end
     end
 
@@ -41,218 +31,93 @@ module DockerTask
     end
     alias :ns :task_namespace
 
-    def container_name
-      @options[:container_name]
-    end
-
-    def image_name
-      @options[:image_name]
-    end
-
     def define!
-      namespace ns do
+      namespace task_namespace do
         desc 'Perform whole cycle of destroy (if any), build, and run'
         task :reset do
-          invoke_task('destroy')
-          invoke_task('build')
-          invoke_task('run')
-        end
-
-        desc 'Rebuild the docker image'
-        task :rebuild do
-          invoke_task('destroy')
-          invoke_task('build')
+          @docker_exec.reset
         end
 
         desc 'Build a new docker image based on the Dockerfile'
         task :build do
-          docker_do 'build -t %s .' % image_name
+          @docker_exec.build
+        end
+
+        desc 'Rebuild the docker image'
+        task :rebuild do
+          @docker_exec.rebuild
         end
 
         desc 'Show help, and how to use this docker tool'
         task :help do
-          puts help_text
+          puts <<-HELP
+This is a set of Rake tasks that you can include in your own Rakefile, to aid in managing docker images and containers.
+HELP
         end
 
         desc 'Run the latest docker image'
         task :run do
-          run_opts = [ ]
-          end_opts = nil
-
-          unless @options[:run].nil?
-            run_opts = @options[:run].call(self, run_opts)
-          end
-
-          if ENV['INTERACTIVE'] == '1'
-            run_opts << '--rm -t -i'
-          else
-            eof_item = run_opts.index(nil)
-            unless eof_item.nil?
-              end_opts = run_opts.slice!(eof_item..-1)
-              end_opts.shift
-            end
-
-            run_opts << '-d'
-            run_opts << '--name=%s' % container_name
-          end
-
-          run_opts << '%s:%s' % [ @options[:image_name], @options.fetch(:run_tag, 'latest') ]
-
-          if ENV['EXEC']
-            docker_do 'run %s /bin/bash -l -c %s' % [ run_opts.join(' '), ENV['EXEC'] ], :ignore_fail => true
-          elsif ENV['INTERACTIVE'] == '1'
-            docker_do 'run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ], :ignore_fail => true
-          elsif end_opts.nil?
-            docker_do 'run %s' % run_opts.join(' ')
-          else
-            docker_do 'run %s %s' % [ run_opts.join(' '), end_opts.join(' ') ]
-          end
+          @docker_exec.run(:exec => ENV['EXEC'])
         end
 
         desc 'Run docker in interactive mode (with bash shell)'
         task :runi do
-          ENV['INTERACTIVE'] = '1'
-          invoke_task('run')
+          @docker_exec.run(:interactive => true)
         end
 
         task :bash do
-          if @options.include?(:bash)
-            exec_cmd = @options[:bash]
-          else
-            exec_cmd = 'bash -l'
-          end
-
-          docker_do('exec -it %s %s' % [ container_name, exec_cmd ], :ignore_fail => true)
+          @docker_exec.bash
         end
 
         desc 'Run docker container'
         task :start do
-          docker_do 'start %s' % container_name
+          @docker_exec.start
         end
 
         desc 'Stop docker container'
         task :stop do
-          docker_do 'stop %s; true' % container_name
+          @docker_exec.stop
         end
 
         desc 'Restart docker container'
         task :restart do
-          invoke_task('stop')
-          invoke_task('start')
+          @docker_exec.restart
         end
 
         desc 'Delete container, and create a new one'
         task :reload do
-          docker_do 'kill %s; true' % container_name
-          docker_do 'rm %s; true' % container_name
-
-          invoke_task('run')
+          @docker_exec.reload
         end
 
         desc 'Push latest built image to repo'
         task :push do
-          if @options[:remote_repo]
-            should_create_tag = false
-
-            if !ENV['PUSH_MIRROR'].nil? && !ENV['PUSH_MIRROR'].empty?
-              mk = ENV['PUSH_MIRROR']
-              pm = @options[:push_mirrors]
-
-              if !pm.nil? && !pm.empty?
-                push_repo = pm[mk.to_sym]
-              else
-                push_repo = nil
-              end
-
-              if push_repo.nil? || push_repo.empty?
-                fail "Mirror %s not found" % mk
-              end
-            else
-              push_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
-            end
-
-            docker_do 'tag %s %s' % [ @options[:image_name], push_repo ]
-            docker_do 'push %s' % push_repo
-          else
-            puts 'Please specify a remote_repo for this docker context'
-          end
+          @docker_exec.push(:push_mirror => ENV['PUSH_MIRROR'])
         end
 
         desc 'Pull from registry based on remote_repo options'
         task :pull do
-          if @options[:remote_repo]
-            pull_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
-
-            if @options[:pull_tag].nil?
-              docker_do 'pull %s' % pull_repo
-              docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
-            else
-              docker_do 'pull %s:%s' % [ pull_repo, @options[:pull_tag] ]
-              docker_do 'tag %s:%s %s' % [ pull_repo, @options[:pull_tag], @options[:image_name] ]
-            end
-          else
-            puts 'Please specify a remote_repo for this docker context'
-          end
+          @docker_exec.pull
         end
 
         desc 'Re-tag a local copy from latest remote (will not pull)'
         task :retag do
-          if @options[:remote_repo]
-            pull_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
-            docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
-          else
-            puts 'Please specify a remote_repo for this docker context'
-          end
+          @docker_exec.retag
         end
 
         desc 'Destroy container and delete image'
         task :destroy do
-          invoke_task('remove')
-          docker_do 'rmi %s' % image_name, :ignore_fail => true
+          @docker_exec.destroy
         end
 
         desc 'Stop and remove container'
         task :remove do
-          docker_do 'kill %s' % container_name, :ignore_fail => true
-          docker_do 'rm %s' % container_name, :ignore_fail => true
+          @docker_exec.remove
         end
       end
     end
 
-    def repo_with_registry(repo_name, registry = nil)
-      if registry.nil?
-        repo_name
-      else
-        '%s/%s' % [ registry, repo_name ]
-      end
-    end
-
-    def docker_cmd(registry = nil)
-      if registry.nil?
-        DOCKER_CMD
-      elsif registry =~ /\.grc\.io/
-        GCLOUD_DOCKER_CMD
-      else
-        DOCKER_CMD
-      end
-    end
-
-    def docker_do(cmd, opts = { })
-      if opts[:ignore_fail]
-        cmd += '; true'
-      end
-
-      sh '%s %s' % [ docker_cmd, cmd ]
-    end
-
     def invoke_task(tname)
-      Rake::Task['%s:%s' % [ ns, tname ]].invoke
-    end
-
-    def help_text
-      <<-HELP
-This is a set of Rake tasks that you can include in your own Rakefile, to aid in managing docker images and containers.
-HELP
+      Rake::Task['%s:%s' % [ task_namespace, tname ]].invoke
     end
   end
 end
