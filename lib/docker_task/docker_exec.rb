@@ -78,7 +78,9 @@ module DockerTask
 
       run_opts << '%s:%s' % [ @options[:image_name], @options[:run_tag] || DEFAULT_TAG ]
 
-      if !opts[:exec].nil?
+      if !opts[:su].nil?
+        docker_do 'run %s /bin/su -l -c "%s" %s' % [ run_opts.join(' '), opts[:exec], opts[:su] ], :ignore_fail => true
+      elsif !opts[:exec].nil?
         docker_do 'run %s /bin/bash -l -c %s' % [ run_opts.join(' '), opts[:exec] ], :ignore_fail => true
       elsif opts[:interactive]
         docker_do 'run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ], :ignore_fail => true
