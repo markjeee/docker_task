@@ -12,7 +12,7 @@ module DockerTask
       end
 
       de = DockerExec.new(opts)
-      if @set.include?(de.container_name)
+      if !opts[:force] && @set.include?(de.container_name)
         raise 'Container with name %s already exist' % de.container_name
       else
         @set[de.container_name] = de

@@ -21,4 +21,14 @@ module DockerTask
   def self.create(opts = nil, &block)
     containers.create(opts, &block)
   end
+
+  def self.create!(opts = nil, &block)
+    if opts.nil?
+      opts = { :force => true }
+    else
+      opts = { :force => true}.merge(opts)
+    end
+
+    containers.create(opts, &block)
+  end
 end

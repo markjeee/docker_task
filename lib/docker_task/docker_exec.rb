@@ -167,7 +167,12 @@ module DockerTask
     def retag
       require_remote_repo do
         pull_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
-        docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
+
+        if @options[:pull_tag].nil?
+          docker_do 'tag %s %s' % [ pull_repo, @options[:image_name] ]
+        else
+          docker_do 'tag %s:%s %s' % [ pull_repo, @options[:pull_tag], @options[:image_name] ]
+        end
       end
     end
 
