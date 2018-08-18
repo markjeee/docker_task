@@ -14,7 +14,11 @@ module DockerTask
       # run options
       :container_name => nil,
       :run_tag => nil,
-      :run => nil
+      :run => nil,
+
+      # preference
+      :show_commands => true,
+      :shhh => false
     }
 
     DOCKER_CMD = 'docker'
@@ -25,6 +29,7 @@ module DockerTask
     def initialize(options)
       @options = DEFAULT_OPTIONS.merge(options)
       @task = @options[:task]
+      @shhh = @options[:shhh]
 
       normalize_options!
     end
@@ -59,9 +64,17 @@ module DockerTask
       run({ :interactive => true }.merge(opts))
     end
 
+    def shhh
+      @shhh = true
+      yield
+    ensure
+      @shhh = @options[:shhh]
+    end
+
     def run(opts = { })
       run_opts = [ ]
       end_opts = nil
+      do_opts = { }
 
       unless @options[:run].nil?
         run_opts = @options[:run].call(self, run_opts)
@@ -83,11 +96,14 @@ module DockerTask
       run_opts << '%s:%s' % [ @options[:image_name], @options[:run_tag] || DEFAULT_TAG ]
 
       if !opts[:su].nil?
-        docker_do 'run %s /bin/su -l -c "%s" %s' % [ run_opts.join(' '), opts[:exec], opts[:su] ], :ignore_fail => true
+        docker_do('run %s /bin/su -l -c "%s" %s' % [ run_opts.join(' '), opts[:exec], opts[:su] ],
+                  { :ignore_fail => true }.merge(do_opts))
       elsif !opts[:exec].nil?
-        docker_do 'run %s /bin/bash -l -c %s' % [ run_opts.join(' '), opts[:exec] ], :ignore_fail => true
+        docker_do('run %s /bin/bash -l -c %s' % [ run_opts.join(' '), opts[:exec] ],
+                  { :ignore_fail => true }.merge(do_opts))
       elsif opts[:interactive]
-        docker_do 'run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ], :ignore_fail => true
+        docker_do('run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ],
+                  { :ignore_fail => true }.merge(do_opts))
       elsif end_opts.nil?
         docker_do 'run %s' % run_opts.join(' ')
       else
@@ -214,11 +230,7 @@ module DockerTask
     end
 
     def docker_do(cmd, opts = { })
-      if opts[:ignore_fail]
-        cmd += '; true'
-      end
-
-      sh '%s %s' % [ docker_cmd, cmd ]
+      sh('%s %s' % [ docker_cmd, cmd ], opts)
     end
 
     def docker_cmd(registry = nil)
@@ -231,13 +243,22 @@ module DockerTask
       end
     end
 
-    def sh(cmd)
-      if @task.nil?
-        puts(cmd)
-        system(cmd)
-      else
-        @task.send(:sh, cmd)
+    def sh(cmd, opts = { })
+      orig_cmd = cmd
+
+      if @shhh
+        cmd += ' >/dev/null 2>&1'
       end
+
+      if opts[:ignore_fail]
+        cmd += '; true'
+      end
+
+      if @options[:show_commands]
+        puts(orig_cmd)
+      end
+
+      system(cmd)
     end
   end
 end
