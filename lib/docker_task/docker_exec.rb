@@ -6,15 +6,22 @@ module DockerTask
       # pull options
       :remote_repo => nil,
       :pull_tag => nil,
+
+      # local registry options
       :image_name => nil,
 
       # push options
       :push_repo => nil,
+      :push_tag => nil,
 
       # run options
       :container_name => nil,
       :run_tag => nil,
       :run => nil,
+
+      # build options
+      :build_path => '.',
+      :dockerfile => 'Dockerfile',
 
       # preference
       :show_commands => true,
@@ -41,6 +48,10 @@ module DockerTask
         @options[:remote_repo] = @options[:push_repo]
       end
 
+      if @options[:pull_tag].nil?
+        @options[:pull_tag] = @options[:push_tag]
+      end
+
       if @options[:image_name].nil?
         @options[:image_name] = '%s-%s' % [ @options[:remote_repo], @options[:pull_tag] || DEFAULT_TAG ]
       end
@@ -63,7 +74,7 @@ module DockerTask
     end
 
     def build
-      docker_do 'build -t %s .' % image_name
+      docker_do 'build -t %s -f %s %s' % [ image_name, @options[:dockerfile], @options[:build_path] ]
     end
 
     def runi(opts = { })
@@ -158,8 +169,8 @@ module DockerTask
 
         if !opts[:push_mirror].nil? && !opts[:push_mirror].empty?
           mk = opts[:push_mirror]
-          pm = @options[:push_mirrors]
 
+          pm = @options[:push_mirrors]
           if !pm.nil? && !pm.empty?
             push_repo = pm[mk.to_sym]
           else
@@ -170,11 +181,16 @@ module DockerTask
             raise "Mirror %s not found" % mk
           end
         else
-          push_repo = repo_with_registry(@options[:remote_repo], @options[:registry])
+          push_repo = repo_with_registry(@options[:push_repo], @options[:registry])
         end
 
-        docker_do 'tag %s %s' % [ @options[:image_name], push_repo ]
-        docker_do 'push %s' % push_repo
+        if @options[:push_tag].nil?
+          docker_do 'tag %s %s' % [ @options[:image_name], push_repo ]
+          docker_do 'push %s' % push_repo
+        else
+          docker_do 'tag %s %s:%s' % [ @options[:image_name], push_repo, @options[:push_tag] ]
+          docker_do 'push %s:%s' % [ push_repo, @options[:push_tag] ]
+        end
       end
     end
 
