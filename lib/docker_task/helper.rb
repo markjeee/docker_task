@@ -41,5 +41,15 @@ module DockerTask
 
       opts
     end
+
+    def self.format_volume_mounts(maps)
+      opts = [ ]
+
+      maps.each do |host_path, exp_vol|
+        opts << '-v %s:%s' % [ host_path, exp_vol ]
+      end
+
+      opts
+    end
   end
 end

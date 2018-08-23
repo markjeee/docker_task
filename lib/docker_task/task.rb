@@ -5,10 +5,13 @@ require 'rake/tasklib'
 module DockerTask
   class Task < Rake::TaskLib
     DEFAULT_OPTIONS = {
-      :namespace => :docker
+      :namespace => :docker,
+      :use => nil,
+      :docker_exec => nil
     }
 
     attr_reader :options
+    attr_reader :docker_exec
 
     def initialize(options = { })
       options = DockerTask::Helper.symbolize_keys(options)
@@ -17,12 +20,14 @@ module DockerTask
       yield(self) if block_given?
 
       @docker_exec = nil
-      if @options[:use]
+      if !@options[:use].nil?
         @docker_exec = DockerTask.containers[@options[:use]]
+      elsif !@options[:docker_exec].nil?
+        @docker_exec = @options[:docker_exec]
       end
 
       if @docker_exec.nil?
-        @docker_exec = DockerExec.new({ task: self }.merge(@options))
+        @docker_exec = DockerExec.new(@options)
       end
     end
 

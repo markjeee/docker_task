@@ -26,10 +26,12 @@ module DockerTask
 
     DEFAULT_TAG = 'latest'
 
+    attr_reader :options
+
     def initialize(options)
       @options = DEFAULT_OPTIONS.merge(options)
-      @task = @options[:task]
       @shhh = @options[:shhh]
+      @run = nil
 
       normalize_options!
     end
@@ -56,6 +58,10 @@ module DockerTask
       @options[:image_name]
     end
 
+    def set_run(run)
+      @run = run
+    end
+
     def build
       docker_do 'build -t %s .' % image_name
     end
@@ -76,8 +82,14 @@ module DockerTask
       end_opts = nil
       do_opts = { }
 
-      unless @options[:run].nil?
-        run_opts = @options[:run].call(self, run_opts)
+      if !@run.nil?
+        run_opts = @run.configure(run_opts)
+      elsif !@options[:run].nil?
+        if @options[:run].is_a?(DockerTask::Run)
+          run_opts = @options[:run].configure(run_opts)
+        else
+          run_opts = @options[:run].call(self, run_opts)
+        end
       end
 
       if opts[:interactive]

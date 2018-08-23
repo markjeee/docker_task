@@ -3,6 +3,7 @@ require 'docker_task/version'
 module DockerTask
   autoload :Task, 'docker_task/task'
   autoload :DockerExec, 'docker_task/docker_exec'
+  autoload :Run, 'docker_task/run'
   autoload :Containers, 'docker_task/containers'
   autoload :Helper, 'docker_task/helper'
 
