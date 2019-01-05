@@ -77,10 +77,6 @@ module DockerTask
       docker_do 'build -t %s -f %s %s' % [ image_name, @options[:dockerfile], @options[:build_path] ]
     end
 
-    def runi(opts = { })
-      run({ :interactive => true }.merge(opts))
-    end
-
     def shhh
       @shhh = true
       yield
@@ -88,10 +84,14 @@ module DockerTask
       @shhh = @options[:shhh]
     end
 
+    def runi(opts = { })
+      run({ :interactive => true }.merge(opts))
+    end
+
     def run(opts = { })
       run_opts = [ ]
       end_opts = nil
-      do_opts = { }
+      do_opts = { }.merge(opts[:do] || { })
 
       if !@run.nil?
         run_opts = @run.configure(run_opts)
@@ -120,13 +120,13 @@ module DockerTask
 
       if !opts[:su].nil?
         docker_do('run %s /bin/su -l -c "%s" %s' % [ run_opts.join(' '), opts[:exec], opts[:su] ],
-                  { :ignore_fail => true }.merge(do_opts))
+                  { :ignore_fail => false }.merge(do_opts))
       elsif !opts[:exec].nil?
         docker_do('run %s /bin/bash -l -c %s' % [ run_opts.join(' '), opts[:exec] ],
-                  { :ignore_fail => true }.merge(do_opts))
+                  { :ignore_fail => false }.merge(do_opts))
       elsif opts[:interactive]
         docker_do('run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ],
-                  { :ignore_fail => true }.merge(do_opts))
+                  { :ignore_fail => false }.merge(do_opts))
       elsif end_opts.nil?
         docker_do 'run %s' % run_opts.join(' ')
       else
@@ -274,7 +274,7 @@ module DockerTask
     def sh(cmd, opts = { })
       orig_cmd = cmd
 
-      if @shhh
+      if opts[:shhh] || @shhh
         cmd += ' >/dev/null 2>&1'
       end
 
@@ -282,7 +282,7 @@ module DockerTask
         cmd += '; true'
       end
 
-      if @options[:show_commands]
+      if opts[:show_commands] || @options[:show_commands]
         puts(orig_cmd)
       end
 
