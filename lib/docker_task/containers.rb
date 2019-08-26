@@ -6,6 +6,18 @@ module DockerTask
       @set = Hash.new
     end
 
+    def load(path = nil)
+      if path.nil?
+        path = File.expand_path('./Containers')
+      end
+
+      if File.exist?(path)
+        ContainersFile.load(self, path)
+      else
+        nil
+      end
+    end
+
     def create(opts = nil)
       if block_given?
         opts = yield(opts || Hash.new)
@@ -35,6 +47,34 @@ module DockerTask
 
     def one_only?
       @set.count == 1
+    end
+
+    class ContainersFile
+      def self.load(containers, path)
+        self.new(containers, path).load
+      end
+
+      def initialize(containers, path)
+        @containers = containers
+        @path = path
+        @common_opts = { }
+      end
+
+      def load
+        Object.send(:const_set, :DT, self)
+        Kernel.load(@path)
+        Object.send(:remove_const, :DT)
+
+        self
+      end
+
+      def common_options
+        @common_opts = yield(@common_opts)
+      end
+
+      def create(opts)
+        @containers.create(@common_opts.merge(opts))
+      end
     end
   end
 end

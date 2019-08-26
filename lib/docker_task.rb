@@ -11,6 +11,10 @@ module DockerTask
     Task.new(options).define!
   end
 
+  def self.load_containers(container_path = nil)
+    containers.load(container_path)
+  end
+
   def self.containers
     if defined?(@@containers)
       @@containers
