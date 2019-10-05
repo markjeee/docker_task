@@ -59,6 +59,22 @@ module DockerTask
       if @options[:container_name].nil?
         @options[:container_name] = @options[:image_name]
       end
+
+      if !@options[:build_path].nil?
+        if @options[:dockerfile] == 'Dockerfile'
+          @options[:dockerfile] = File.join(@options[:build_path], @options[:dockerfile])
+        elsif @options[:dockerfile].nil?
+          @options[:dockerfile] = File.join(@options[:build_path], 'Dockerfile')
+        end
+
+        if !@options[:pull_tag].nil? && @options[:push_tag].nil?
+          @options[:push_tag] = @options[:pull_tag]
+        end
+
+        if !@options[:remote_repo].nil? && @options[:push_repo].nil?
+          @options[:push_repo] = @options[:remote_repo]
+        end
+      end
     end
 
     def container_name
@@ -73,8 +89,16 @@ module DockerTask
       @run = run
     end
 
+    def can_build?
+      !@options[:build_path].nil?
+    end
+
     def build
-      docker_do 'build -t %s -f %s %s' % [ image_name, @options[:dockerfile], @options[:build_path] ]
+      if can_build?
+        docker_do 'build -t %s -f %s %s' % [ image_name, @options[:dockerfile], @options[:build_path] ]
+      else
+        raise "Cant build. No :build_path specified."
+      end
     end
 
     def shhh
@@ -165,8 +189,6 @@ module DockerTask
 
     def push(opts = { })
       require_remote_repo do
-        should_create_tag = false
-
         if !opts[:push_mirror].nil? && !opts[:push_mirror].empty?
           mk = opts[:push_mirror]
 
