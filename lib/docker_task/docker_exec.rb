@@ -117,6 +117,10 @@ module DockerTask
       end_opts = nil
       do_opts = { }.merge(opts[:do] || { })
 
+      if !do_opts.include?(:capture) && opts.include?(:capture)
+        do_opts[:capture] = opts[:capture]
+      end
+
       if !@run.nil?
         run_opts = @run.configure(run_opts)
       elsif !@options[:run].nil?
@@ -127,7 +131,9 @@ module DockerTask
         end
       end
 
-      if opts[:interactive]
+      if !opts[:su].nil? || !opts[:exec].nil?
+        run_opts << '--rm -t'
+      elsif opts[:interactive]
         run_opts << '--rm -t -i'
       else
         eof_item = run_opts.index(nil)
@@ -280,7 +286,30 @@ module DockerTask
     end
 
     def docker_do(cmd, opts = { })
-      sh('%s %s' % [ docker_cmd, cmd ], opts)
+      unless opts.include?(:shhh)
+        opts[:shhh] = @shhh
+      end
+
+      unless opts.include?(:show_commands)
+        opts[:show_commands] = @options[:show_commands]
+      end
+
+      cmd = '%s %s' % [ docker_cmd, cmd ]
+      if opts[:show_commands]
+        puts(cmd)
+      end
+
+      out_buffer, err_buffer, exit_status = DockerTask::Executor.sh(cmd, opts)
+
+      if opts[:capture]
+        [ out_buffer, err_buffer, exit_status ]
+      else
+        if opts[:ignore_fail]
+          true
+        else
+          exit_status.success?
+        end
+      end
     end
 
     def docker_cmd(registry = nil)
@@ -291,24 +320,6 @@ module DockerTask
       else
         DOCKER_CMD
       end
-    end
-
-    def sh(cmd, opts = { })
-      orig_cmd = cmd
-
-      if opts[:shhh] || @shhh
-        cmd += ' >/dev/null 2>&1'
-      end
-
-      if opts[:ignore_fail]
-        cmd += '; true'
-      end
-
-      if opts[:show_commands] || @options[:show_commands]
-        puts(orig_cmd)
-      end
-
-      system(cmd)
     end
   end
 end

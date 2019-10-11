@@ -6,6 +6,7 @@ module DockerTask
   autoload :Run, 'docker_task/run'
   autoload :Containers, 'docker_task/containers'
   autoload :Helper, 'docker_task/helper'
+  autoload :Executor, 'docker_task/executor'
 
   def self.include_tasks(options = { })
     Task.new(options).define!
