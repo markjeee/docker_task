@@ -131,6 +131,10 @@ module DockerTask
         end
       end
 
+      if !opts[:env_file].nil?
+        run_opts << '--env-file %s' % opts[:env_file]
+      end
+
       if !opts[:su].nil? || !opts[:exec].nil?
         run_opts << '--rm -t'
       elsif opts[:interactive]
