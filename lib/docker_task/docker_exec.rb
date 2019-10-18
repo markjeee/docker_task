@@ -160,7 +160,7 @@ module DockerTask
                   { :ignore_fail => false }.merge(do_opts))
       elsif opts[:interactive]
         docker_do('run %s %s' % [ run_opts.join(' '), '/bin/bash -l' ],
-                  { :ignore_fail => false }.merge(do_opts))
+                  { :ignore_fail => false, :interactive => true }.merge(do_opts))
       elsif end_opts.nil?
         docker_do 'run %s' % run_opts.join(' ')
       else
@@ -303,15 +303,19 @@ module DockerTask
         puts(cmd)
       end
 
-      out_buffer, err_buffer, exit_status = DockerTask::Executor.sh(cmd, opts)
-
-      if opts[:capture]
-        [ out_buffer, err_buffer, exit_status ]
+      if opts[:interactive]
+        DockerTask::Executor.sys(cmd, opts)
       else
-        if opts[:ignore_fail]
-          true
+        out_buffer, err_buffer, exit_status = DockerTask::Executor.pipe(cmd, opts)
+
+        if opts[:capture]
+          [ out_buffer, err_buffer, exit_status ]
         else
-          exit_status.success?
+          if opts[:ignore_fail]
+            true
+          else
+            exit_status.success?
+          end
         end
       end
     end

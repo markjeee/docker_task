@@ -2,8 +2,12 @@ require 'open3'
 
 module DockerTask
   class Executor
-    def self.sh(cmd, opts = { })
-      new(cmd, opts).sh
+    def self.sys(cmd, opts = { })
+      new(cmd, opts).sys
+    end
+
+    def self.pipe(cmd, opts = { })
+      new(cmd, opts).pipe
     end
 
     def initialize(cmd, opts = { })
@@ -11,7 +15,11 @@ module DockerTask
       @opts = opts
     end
 
-    def sh
+    def sys
+      system(@cmd)
+    end
+
+    def pipe
       executor = self
 
       out_buffer, err_buffer, exit_status = Open3.popen3(@cmd) do |i, o, e, t|
