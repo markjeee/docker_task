@@ -1,12 +1,15 @@
 require 'docker_task/version'
 
 module DockerTask
-  autoload :Task, 'docker_task/task'
-  autoload :DockerExec, 'docker_task/docker_exec'
-  autoload :Run, 'docker_task/run'
   autoload :Containers, 'docker_task/containers'
-  autoload :Helper, 'docker_task/helper'
+  autoload :DockerExec, 'docker_task/docker_exec'
   autoload :Executor, 'docker_task/executor'
+  autoload :Helper, 'docker_task/helper'
+
+  autoload :Do, 'docker_task/do'
+
+  autoload :Task, 'docker_task/task'
+  autoload :Run, 'docker_task/run'
 
   def self.include_tasks(options = { })
     Task.new(options).define!
@@ -37,4 +40,6 @@ module DockerTask
 
     containers.create(opts, &block)
   end
+
+  extend Do::Methods
 end
