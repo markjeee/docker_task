@@ -93,16 +93,32 @@ module DockerTask
       !@options[:build_path].nil?
     end
 
-    def build
+    def build(opts = { })
+
       if can_build?
-        docker_do 'build -t %s -f %s %s' % [ image_name, @options[:dockerfile], @options[:build_path] ]
+        build_args = 'build -t %s -f %s' % [ image_name, @options[:dockerfile] ]
+
+        if opts[:no_cache]
+          build_args << ' --no-cache'
+        end
+
+        build_args << ' %s' % @options[:build_path]
+
+        shhh(false) do
+          docker_do(build_args)
+        end
       else
         raise "Cant build. No :build_path specified."
       end
     end
 
-    def shhh
-      @shhh = true
+    def shhh(override = nil)
+      if override.nil?
+        @shhh = true
+      else
+        @shhh = override
+      end
+
       yield
     ensure
       @shhh = @options[:shhh]
